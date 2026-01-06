@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { User } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { User, LogOut, KeyRound, ChevronDown } from "lucide-react";
+import { signOut } from "@/lib/auth/actions";
 
 export default async function PublicLayout({
   children,
@@ -13,17 +22,52 @@ export default async function PublicLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Check if user has staff role
+  // Get user profile if logged in
+  let userName: string | null = null;
+  let userEmail: string | null = null;
   let isStaff = false;
+
   if (user) {
+    userEmail = user.email || null;
+    
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: profile } = await (supabase.from("profiles") as any)
-      .select("role")
+      .select("role, full_name")
       .eq("id", user.id)
       .single();
-    
-    isStaff = profile?.role && ["admin", "barber", "staff"].includes(profile.role);
+
+    if (profile) {
+      userName = profile.full_name;
+      isStaff = profile.role && ["admin", "barber", "staff"].includes(profile.role);
+    }
+
+    // Try to get name from clients table if not in profile
+    if (!userName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: client } = await (supabase.from("clients") as any)
+        .select("name")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (client) {
+        userName = client.name;
+      }
+    }
+
+    // Fallback to email
+    if (!userName) {
+      userName = userEmail?.split("@")[0] || "Usuário";
+    }
   }
+
+  const initials = userName
+    ? userName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "US";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -38,13 +82,6 @@ export default async function PublicLayout({
           </Link>
 
           <nav className="flex items-center gap-4">
-            <Link
-              href="/agendar"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Agendar
-            </Link>
-            
             {user ? (
               <div className="flex items-center gap-3">
                 {isStaff && (
@@ -55,12 +92,51 @@ export default async function PublicLayout({
                     Dashboard
                   </Link>
                 )}
-                <Link href="/minha-conta">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <User className="h-4 w-4" />
-                    Minha Conta
-                  </Button>
-                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                      <Avatar className="h-9 w-9 border-2 border-primary">
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-left hidden sm:block">
+                        <p className="text-sm font-medium leading-tight">{userName}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">{userEmail}</p>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link href="/minha-conta" className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Minha Conta
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/minha-conta/perfil" className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Editar Perfil
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/minha-conta/senha" className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4" />
+                        Trocar Senha
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <form action={signOut} className="w-full">
+                        <button type="submit" className="flex items-center gap-2 w-full text-red-500">
+                          <LogOut className="h-4 w-4" />
+                          Sair
+                        </button>
+                      </form>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               <Link href="/login">
@@ -77,19 +153,11 @@ export default async function PublicLayout({
       <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-8">
+      <footer className="border-t border-border bg-card py-4">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-xl font-bold text-foreground">
-                LA MAFIA
-              </span>
-              <span className="font-serif text-primary">13</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} LA MAFIA 13. Todos os direitos reservados.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground text-center">
+            © {new Date().getFullYear()} LA MAFIA 13. Todos os direitos reservados.
+          </p>
         </div>
       </footer>
     </div>

@@ -1,34 +1,17 @@
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Calendar,
   CreditCard,
   Clock,
-  User,
-  LogOut,
-  ChevronDown,
   Scissors,
-  Plus,
   History,
-  Settings,
-  KeyRound,
 } from "lucide-react";
-import { signOut } from "@/lib/auth/actions";
 
 export const metadata: Metadata = {
   title: "Minha Conta | LA MAFIA 13",
@@ -46,15 +29,6 @@ async function getData() {
     redirect("/login");
   }
 
-  // Get user profile
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profileResult } = await (supabase.from("profiles") as any)
-    .select("full_name, avatar_url")
-    .eq("id", user.id)
-    .single();
-
-  const profile = profileResult as { full_name: string | null; avatar_url: string | null } | null;
-
   // Get client profile
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: clientResult } = await (supabase.from("clients") as any)
@@ -65,11 +39,9 @@ async function getData() {
   if (!clientResult) {
     return {
       user,
-      profile,
       client: null,
       appointments: [],
       pastAppointments: [],
-      subscription: null,
       payments: [],
     };
   }
@@ -133,22 +105,6 @@ async function getData() {
 
   const pastAppointments = (pastAppointmentsResult || []) as unknown as AppointmentWithRelations[];
 
-  // Get active subscription
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: subscriptionResult } = await (supabase.from("subscriptions") as any)
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("status", "active")
-    .single();
-
-  const subscription = subscriptionResult as {
-    id: string;
-    plan_name: string;
-    plan_description: string | null;
-    monthly_price: number;
-    current_period_end: string | null;
-  } | null;
-
   // Get payment history
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: paymentsResult } = await (supabase.from("payment_intents") as any)
@@ -170,11 +126,9 @@ async function getData() {
 
   return {
     user,
-    profile,
     client: clientData,
     appointments,
     pastAppointments,
-    subscription,
     payments,
   };
 }
@@ -214,8 +168,7 @@ const paymentStatusColors: Record<string, string> = {
 };
 
 export default async function MinhaContaPage() {
-  const { user, profile, client, appointments, pastAppointments, subscription, payments } =
-    await getData();
+  const { appointments, pastAppointments, payments } = await getData();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -224,76 +177,12 @@ export default async function MinhaContaPage() {
     }).format(value);
   };
 
-  const userName = profile?.full_name || client?.name || user?.email?.split("@")[0] || "Usuário";
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
   return (
-    <div className="min-h-[calc(100vh-8rem)]">
-      {/* User Header Bar */}
-      <div className="border-b border-border bg-card/50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 border-2 border-primary">
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium text-lg">Olá, {userName}</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
-              </div>
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Settings className="h-4 w-4" />
-                  Configurações
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem asChild>
-                  <Link href="/minha-conta/perfil" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Editar Perfil
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/minha-conta/senha" className="flex items-center gap-2">
-                    <KeyRound className="h-4 w-4" />
-                    Trocar Senha
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <form action={signOut} className="w-full">
-                    <button type="submit" className="flex items-center gap-2 w-full text-red-500">
-                      <LogOut className="h-4 w-4" />
-                      Sair
-                    </button>
-                  </form>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
-
+    <div className="h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
       {/* Main Content with Tabs */}
-      <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="agendar" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid bg-card border border-border">
-            <TabsTrigger value="agendar" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Plus className="h-4 w-4 hidden sm:block" />
-              Agendar
-            </TabsTrigger>
+      <div className="container mx-auto px-4 py-6 flex-1 flex flex-col overflow-hidden">
+        <Tabs defaultValue="agendados" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid bg-card border border-border shrink-0">
             <TabsTrigger value="agendados" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Calendar className="h-4 w-4 hidden sm:block" />
               Meus Cortes
@@ -308,92 +197,8 @@ export default async function MinhaContaPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: Agendar */}
-          <TabsContent value="agendar" className="space-y-8">
-            <div className="text-center py-12 space-y-6">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10">
-                <Scissors className="h-10 w-10 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-serif font-bold">Agende seu próximo corte</h2>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  Escolha o serviço, barbeiro e horário de sua preferência
-                </p>
-              </div>
-              <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8">
-                <Link href="/agendar">
-                  <Plus className="mr-2 h-5 w-5" />
-                  Novo Agendamento
-                </Link>
-              </Button>
-            </div>
-
-            {/* Active Subscription */}
-            {subscription && (
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-primary/10">
-                      <CreditCard className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-lg">{subscription.plan_name}</p>
-                      <p className="text-sm text-muted-foreground">{subscription.plan_description}</p>
-                      {subscription.current_period_end && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Próximo vencimento:{" "}
-                          {format(new Date(subscription.current_period_end), "dd/MM/yyyy")}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(subscription.monthly_price)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">/mês</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Quick Stats */}
-            {client && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
-                  <p className="text-3xl font-bold text-primary">{client.total_visits}</p>
-                  <p className="text-sm text-muted-foreground">Visitas</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
-                  <p className="text-3xl font-bold text-foreground">{appointments.length}</p>
-                  <p className="text-sm text-muted-foreground">Agendados</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
-                  <p className="text-3xl font-bold text-foreground">{pastAppointments.length}</p>
-                  <p className="text-sm text-muted-foreground">Concluídos</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
-                  <p className="text-3xl font-bold text-foreground">
-                    {payments.filter((p) => p.status === "paid").length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Pagamentos</p>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
           {/* Tab: Meus Cortes (Agendados) */}
-          <TabsContent value="agendados" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-serif font-semibold">Próximos Agendamentos</h2>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/agendar">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Novo
-                </Link>
-              </Button>
-            </div>
-
+          <TabsContent value="agendados" className="flex-1 overflow-auto mt-6">
             {appointments.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto" />
@@ -403,9 +208,6 @@ export default async function MinhaContaPage() {
                     Você não tem cortes agendados no momento
                   </p>
                 </div>
-                <Button asChild variant="outline">
-                  <Link href="/agendar">Agendar agora</Link>
-                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -438,9 +240,7 @@ export default async function MinhaContaPage() {
           </TabsContent>
 
           {/* Tab: Histórico */}
-          <TabsContent value="historico" className="space-y-6">
-            <h2 className="text-xl font-serif font-semibold">Histórico de Cortes</h2>
-
+          <TabsContent value="historico" className="flex-1 overflow-auto mt-6">
             {pastAppointments.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <Clock className="h-12 w-12 text-muted-foreground mx-auto" />
@@ -485,9 +285,7 @@ export default async function MinhaContaPage() {
           </TabsContent>
 
           {/* Tab: Pagamentos */}
-          <TabsContent value="pagamentos" className="space-y-6">
-            <h2 className="text-xl font-serif font-semibold">Histórico de Pagamentos</h2>
-
+          <TabsContent value="pagamentos" className="flex-1 overflow-auto mt-6">
             {payments.length === 0 ? (
               <div className="text-center py-16 space-y-4">
                 <CreditCard className="h-12 w-12 text-muted-foreground mx-auto" />
